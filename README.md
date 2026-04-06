@@ -132,8 +132,6 @@ The app will open automatically in your browser at `http://localhost:8501`.
 
 Arin Risk Advisors, LLC is a financial risk advisory firm specialising in volatility management and options-based portfolio strategies. The firm helps fiduciaries and institutional investors construct resilient portfolios that balance return objectives with downside protection.
 
-*Clear. Trustworthy. Professional. Human. Data-driven. Empowering.*
-
 ---
 
 *Built with Python and Streamlit. Market data provided by Yahoo Finance.*
