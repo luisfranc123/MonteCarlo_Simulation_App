@@ -135,3 +135,9 @@ Arin Risk Advisors, LLC is a financial risk advisory firm specialising in volati
 ---
 
 *Built with Python and Streamlit. Market data provided by Yahoo Finance.*
+
+---
+
+## Refrences
+
+Arin Risk Advisors, LLC. (2016). Carson institutional portfolio construction write-up (Version 1.2) [Internal report].
