@@ -12,7 +12,7 @@ This application simulates how a diversified investment portfolio might behave o
 
 ---
 
-## Background — Key Concepts for the Lay Reader
+## Background — Key Concepts 
 
 ### What Is a Portfolio Distribution?
 
