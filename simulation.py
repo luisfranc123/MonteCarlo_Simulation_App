@@ -54,7 +54,7 @@ def derive_asset_returns(spy_returns: np.ndarray,
     beta = (asset_vol/spy_vol)*corr
     asset_return = spy_return*beta
 
-    Paramters:
+    Parameters:
         - spy_returns: the 1,000 SPY monthly returns
         - asset_exp_return: annualized expected return of the asset
         - asset_volatility: annualized volatility of the asset
@@ -116,8 +116,8 @@ def derive_dynamic_returns(spy_returns: np.ndarray,
 
     Parameters:
         - spy_returns: the 1,000 SPY monthly returns
-        - asset_volatility: annualised volatility of the asset
-        - spy_volatility: annualised volatility of SPY
+        - asset_volatility: annualized volatility of the asset
+        - spy_volatility: annualized volatility of SPY
         - base_correlation: the historical Pearson correlation
         - stress_threshold: SPY return below which stress kicks in (-2%)
         - float_range: (min, max) multiplier for normal regime
@@ -204,6 +204,7 @@ def run_simulation(portfolio: pd.DataFrame,
                    n_simulations: int = 1000, 
                    n_months: int = 120, 
                    risk_free_rate: float = 0.0225,
+                   arin_fee: float = 0.0025, 
                    use_overlay: dict = None, 
                    random_seed: int = None) -> dict:
     """
@@ -292,13 +293,15 @@ def run_simulation(portfolio: pd.DataFrame,
         portfolio = portfolio,
         risk_free_rate = risk_free_rate,
         dividend_yields = dividend_yields, 
+        arin_fee = arin_fee, 
         equity_only = False,            
         )
     equity_path = apply_portfolio_overlay(
         returns_df = dynamic_path,
         portfolio = portfolio,
         risk_free_rate = risk_free_rate,
-        dividend_yields = dividend_yields, 
+        dividend_yields = dividend_yields,
+        arin_fee = arin_fee, 
         equity_only = True,              
         )
 

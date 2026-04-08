@@ -16,7 +16,7 @@ from scipy.stats import norm
 def black_scholes_price(S: float, K: float, r: float, sigma: float, 
                         T: float, option_type: str, q: float = 0.0,) -> float:
     """
-    Claculates the theoretical price of a European call or put option
+    Calculates the theoretical price of a European call or put option
     using the Black-Scholes model.
 
     Args:
@@ -80,8 +80,8 @@ def collar_cost(volatility: float,
     Net cost = (put_price × (1 + skew_factor)) - call_price + arin_fee
 
     Parameters:
-        - volatility: annualised asset volatility
-        - risk_free_rate: annualised risk-free rate
+        - volatility: annualized asset volatility
+        - risk_free_rate: annualized risk-free rate
         - strike_width: how far OTM the strikes are (0.05 = 5%)
         - skew_factor: premium added to put to reflect vol smile (0.05)
         - arin_fee: Arin's monthly advisory fee as decimal (0.0025)
@@ -164,7 +164,7 @@ def apply_portfolio_overlay(returns_df,
     Applies collar overlay to a portfolio returns DataFrame.
 
     Parameters:
-        - returns_df: pd.DataFrame (rows=months, cols=asset names)
+        - returns_df: pd.DataFrame (rows = months, cols = asset names)
           from simulation.py
         - portfolio: pd.DataFrame from build_portfolio() in data.py
         - risk_free_rate annualised risk-free rate

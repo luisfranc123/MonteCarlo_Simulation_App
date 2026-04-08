@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 import streamlit as st
+from scipy.stats import linregress
 
 # -----------------------------------------------------------------
 # ASSET DEFINITIONS
@@ -153,6 +154,161 @@ def fetch_dividend_yields() -> dict:
         yields[ticker] = q
     
     return yields
+# -----------------------------------------------------------------
+# FETCH BOX RATE
+# Estimates the risk-free rate from SPX options using put-call
+# parity. This is the "box rate" described in:
+# van Binsbergen, Diamond & Van Tassel (2023), NY Fed Liberty
+# Street Economics.
+#
+# Method:
+#   For each strike K with valid call and put mid-prices:
+#       y = put_mid - call_mid
+#       x = K
+#   Fit OLS regression: y = intercept + slope*x
+#   slope = e^(-r*T)  →  r = -ln(slope)/T
+# -----------------------------------------------------------------
+@st.cache_data(ttl = 900)
+def fetch_box_rate(min_days: int = 30) -> dict:
+    """
+    Estimates the annualized risk-free rate from live SPX options
+    using put-call parity regression (the box rate). 
+
+    Parameters:
+        - min_days: minimum days to expiration to consider (default 30)
+
+    Returns: 
+    - dict with keys:
+    'rate': float — annualized vox rate
+    'expiration': str — expiration dated used
+    'r_squared': float — regression fit 
+    'n_strikes': int — number of strikes used
+    'source': str — 'box_rate' or 'fallback'
+    """
+    fallback_rate = 0.0450 # Approximately current SOFR as of 2025
+
+    try:
+        spx = yf.Ticker("^SPX")
+
+        # --- 1. Get current SPX spot price ---
+        spot_info = spx.fast_info
+        S = spot_info["last_price"]
+
+        if S is None or S <= 0:
+            raise ValueError("Could not fetch SPX spot price")
+
+        # --- 2. Find the right expiration ---
+        expirations = spx.options
+        if not expirations:
+            raise ValueError("No SPX options expirations available")
+
+        today = pd.Timestamp.today().normalize()
+        chosen_exp = None
+        chosen_days = None
+
+        for exp_str in expirations:
+            exp_date = pd.Timestamp(exp_str)
+            days = (exp_date - today).days
+            if days >= min_days:
+                chosen_exp = exp_str
+                chosen_days = days
+                break
+
+        if chosen_exp is None:
+            raise ValueError(
+                f"No expiration found with at least {min_days} days"
+            )
+
+        # T in years — actual calendar days divided by 365
+        T = chosen_days /365
+
+        # --- 3. Fetch the options chain ---
+        chain = spx.option_chain(chosen_exp)
+        calls = chain.calls.copy()
+        puts = chain.puts.copy()
+
+        # Compute mid-prices — average of bid and ask
+        calls["mid"] = (calls["bid"] + calls["ask"])/2
+        puts["mid"] = (puts["bid"] + puts["ask"])/2
+
+        # Keep only strikes with valid (positive) mid-prices
+        calls = calls[calls["mid"] > 0][["strike", "mid"]]
+        puts = puts[puts["mid"] > 0][["strike", "mid"]]
+
+        # --- 4. Merge on Strike ---
+        merged = pd.merge(
+            calls.rename(columns = {"mid": "call_mid"}),
+            puts.rename(columns = {"mid": "put_mid"}),
+            on = "strike"            
+        )
+
+        if len(merged) < 10:
+            raise ValueError(
+                f"Too few matched strikes ({len(merged)}) for regression"
+            )
+
+        # --- 5. Filter to strikes near the money
+        # far out-of-the-money options have wide bid-ask spreads
+        # can distort the regression. We keep strikes within 
+        # 20% of the current spot price.
+        merged = merged[
+            (merged["strike"] >= S*0.80) &
+            (merged["strike"] <= S*1.20)
+        ]
+
+        if len(merged) < 5:
+            raise ValueError(
+                f"Too few near-the-money strikes ({len(merged)})"
+            )
+
+        # 6. --- Put-call parity regression ---
+        # y = put_mid - call_mid
+        # x = K
+        # Fit OLS regression: y = intercept + slope*x
+        # slope = e^(-r*T)  →  r = -ln(slope)/T
+        y = merged["put_mid"] - merged["call_mid"]
+        x = merged["strike"]
+        result = linregress(x, y)
+        slope = result.slope
+        r_sq = result.rvalue**2
+
+        # guard against negative or zero slope before taking log
+        if slope <= 0:
+            raise ValueError(
+                f"Regression slope is non-positive ({slope:.4f})"
+            )
+
+        # convert slope to annualized rate
+        box_rate = -np.log(slope)/T
+
+        # Sanity check — box rate should be between 0% and 15%
+        # If outside, something went wrong
+        if not (0.0 <= box_rate <= 0.15):
+            raise ValueError(
+                f"Box rate {box_rate:.4f} outside reasonable range"
+            )
+
+        return {
+            "rate": round(box_rate, 6),
+            "expiration": chosen_exp,
+            "days": chosen_days,
+            "r_squared": round(r_sq, 8),
+            "n_strikes": len(merged),
+            "source": "box_rate",
+        }
+
+    except Exception as e:
+        # If anything fails, return the fallback rate
+        # and record an error message
+        return {
+            "rate": fallback_rate,
+            "expiration": None,
+            "days": None,
+            "r_squared": None,
+            "n_strikes": None,
+            "source": "fallback",
+            "error": str(e), 
+        }
 # -----------------------------------------------------------------
 # BUILD PORTFOLIO INPUTS
 # Maps the fetched yfinance data back onto our 14-asset list.

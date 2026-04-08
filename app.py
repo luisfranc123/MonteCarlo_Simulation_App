@@ -6,7 +6,8 @@ import pandas as pd
 import numpy as np
 
 from data import (yf_tickers, assets, build_portfolio, 
-                  fetch_portfolio_data, fetch_dividend_yields)
+                  fetch_portfolio_data, fetch_dividend_yields, 
+                  fetch_box_rate)
 from simulation import run_simulation
 from analytics import compute_all_statistics, compute_asset_statistics
 from charts import (distribution_charts, statistics_table, 
@@ -26,14 +27,14 @@ st.markdown("""
 <style>
   /* ── Arin Risk Advisors brand palette ── */
   :root{
-    --bg: #0D2948; /* Deep Navy Blue — main background */
-    --surf: #0a2038; /* Darker navy — card/surface background */
-    --surf2: #071828; /* Deepest navy — sidebar background */
-    --acc: #1B8FFB; /* Sky Blue — accents, links, highlights */
-    --txt: #FFFFFF; /* White — primary text on navy */
-    --mut: #80807F; /* Neutral Gray — secondary / muted text */
-    --border: #1a3a5c; /* Navy tint — borders and dividers */
-    --black: #313131; /* Brand black — used in tables/badges */
+    --bg: #0D2948;
+    --surf: #0a2038;
+    --surf2: #071828;
+    --acc: #1B8FFB;
+    --txt: #FFFFFF;
+    --mut: #80807F;
+    --border: #1a3a5c;
+    --black: #313131;
   }
   .stApp{background:var(--bg);color:var(--txt);
          font-family:'Calibri','Georgia',serif}
@@ -51,6 +52,7 @@ st.markdown("""
       font-family:'Segoe UI','Arial',sans-serif;
       border-bottom:1px solid var(--border);
       padding-bottom:6px;margin:18px 0 12px}
+
   /* ── Sidebar text ── */
   section[data-testid="stSidebar"] label,
   section[data-testid="stSidebar"] p,
@@ -61,6 +63,18 @@ st.markdown("""
   section[data-testid="stSidebar"] .stToggle label{
     color: #FFFFFF !important;
   }
+
+  /* ── Portfolio editor table text ── */
+  [data-testid="stDataEditor"] td,
+  [data-testid="stDataEditor"] th,
+  [data-testid="stDataEditor"] span {
+    color: #313131 !important;
+  }
+
+  /* ── Main panel text ── */
+  .stApp p, .stApp span, .stApp label,
+  .stApp .stCaption { color: #FFFFFF !important; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -108,14 +122,45 @@ n_months = st.number_input(
     step = 12, 
     help = "120 months = 10 years. Each step adds one year.",     
 )
-risk_free_rate = st.sidebar.number_input(
-    label = "Risk-free rate",
-    min_value = 0.0,
-    max_value = 0.10,
-    value = 0.0225,
-    step = 0.0025,
-    format = "%.4f",
-    help = "Annualised risk-free rate used in Sharpe ratio calculation.",
+
+st.sidebar.divider()
+st.sidebar.subheader("Risk-Free Rate")
+# Fetch live box rate from SPX options
+box_rate_data = fetch_box_rate()
+risk_free_rate = box_rate_data["rate"]
+
+if box_rate_data["source"] == "box_rate":
+    st.sidebar.markdown(
+        f"""
+        <div class='kpi'>
+                <div class='lbl'>Box Rate (SPX Options)</div>
+                <div class='val'>{risk_free_rate:.2%}</div>
+                <div class='sub'>
+                    Expiry {box_rate_data['expiration']} · 
+                    {box_rate_data['days']}d · 
+                    R² {box_rate_data['r_squared']:.6f} · 
+                    {box_rate_data['n_strikes']} strikes
+                </div>
+            </div>
+        """, 
+        unsafe_allow_html = True, 
+    )
+else:
+    st.sidebar.warning(
+    f"Box rate unavailable — using fallaback "
+    f"{risk_free_rate:.2%}. "
+    f"Reason: {box_rate_data.get('error', 'unknown')}"
+    )
+
+arin_fee = st.sidebar.number_input(
+    label = "Arin advisory fee (monthly)", 
+    min_value = 0.0000, 
+    max_value = 0.0100, 
+    value = 0.0025, 
+    step = 0.0005, 
+    format = "%.4f", 
+    help = "Monthly fee deducted from collar-adjusted returns.  "
+           "Default 0.0025 = 0.25% per month.", 
 )
 # -----------------------------------------------------------------
 # Sidebar — Options Overlay Toggles 
@@ -147,7 +192,7 @@ st.sidebar.caption(
 )
 # Build the editable DataFrame from live data
 editor_df = portfolio_base[[
-    "name", "weight", "exp_return", "volatility", "source"
+    "name", "yf_ticker", "weight", "exp_return", "volatility", "source"
 ]].copy()
 
 # Convert volatility percentages for readibility in the editor
@@ -157,7 +202,7 @@ editor_df["volatility"] = editor_df["volatility"]*100
 
 # rename columns for display
 editor_df.columns = [
-    "Asset", "Weight (%)", "Exp. Return (%)", "Volatility (%)", "Source"
+    "Asset", "Ticker", "Weight (%)", "Exp. Return (%)", "Volatility (%)", "Source"
 ]
 
 # st.data_editor renders an editable table.
@@ -165,7 +210,7 @@ edited_df = st.sidebar.data_editor(
     editor_df, 
     use_container_width = True, 
     hide_index = True, 
-    disabled = ["Asset", "Source"], 
+    disabled = ["Asset", "Ticker", "Source"], 
     column_config = {
         "Weight (%)": st.column_config.NumberColumn(
             format = "%.2f", 
@@ -226,7 +271,8 @@ if run_button:
             dividend_yields = dividend_yields, 
             n_simulations = n_simulations, 
             n_months = n_months, 
-            risk_free_rate = risk_free_rate, 
+            risk_free_rate = risk_free_rate,
+            arin_fee = arin_fee, 
             use_overlay = {
                 "volatility": run_volatility, 
                 "equity": run_equity, 

@@ -5,6 +5,7 @@
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from scipy.stats import gaussian_kde
 from analytics import (weighted_portfolio_returns,
                         compute_all_statistics)
@@ -32,117 +33,116 @@ case_styles = {
 # =================================================================
 # 2. The Distribution Chart
 # =================================================================
-def distribution_charts(simulation_results: dict, 
-                        portfolio: pd.DataFrame, 
+def distribution_charts(simulation_results: dict,
+                        portfolio: pd.DataFrame,
                         risk_free_rate: float) -> go.Figure:
-
     """
-    Builds a Plotly figure showing the kde return distribution 
-    for all 4 simulations overlaid on one chart. 
-    
-    Parameters:    
-        - simulation_results : dict from run_simulation() in simulation.py
-        - portfolio: pd.DataFrame from build_portfolio() in data.py
-        - risk_free_rate: annualised risk-free rate (for annotation)
+    Builds a Plotly figure showing relative frequency histograms
+    for all four simulation cases overlaid on one chart.
 
-    Returns
-    
-        go.Figure — a Plotly figure 
-    
+    Each bar shows the fraction of simulated monthly returns
+    that fell within that return range — no smoothing assumptions.
     """
-    # Internal keys 
+
     case_labels = {
-        "base": "Base Case", 
-        "dynamic": "Dynamic Beta Case", 
+        "base": "Base Case",
+        "dynamic": "Dynamic Beta Case",
         "volatility": "Volatility Managed Case",
         "equity": "Equity Hedged Case",
     }
-    fig = go.Figure()
+    
+    # 2x2 grid — row 1: Base, Dynamic | row 2: Volatility, Equity
+    positions = {
+        "base": (1, 1),
+        "dynamic": (1, 2),
+        "volatility": (2, 1),
+        "equity": (2, 2),
+    }
+
+    fig = make_subplots(
+        rows = 2,
+        cols = 2,
+        subplot_titles = list(case_labels.values()),
+        horizontal_spacing = 0.08,
+        vertical_spacing = 0.14,
+    )
 
     for case_key, case_label in case_labels.items():
-        returns_df = simulation_results[case_key]
+        row, col = positions[case_key]
 
-        # get weighted portfolio retuns
+        returns_df = simulation_results[case_key]
         portfolio_returns = weighted_portfolio_returns(
             returns_df, portfolio
         )
-    
-        # Convert to numpy array for scipy
         returns_array = portfolio_returns.values
-    
-        # Build the kde
-        kde = gaussian_kde(returns_array)
-    
-        # create x-grid
-        x_min = returns_array.min() - 0.01
-        x_max = returns_array.max() + 0.01
-        x_vals = np.linspace(x_min, x_max, 300)
-        
-        # evaluate the kde at each x value 
-        y_vals = kde(x_vals)
-    
-        # Add the trace to the figure
-        fig.add_trace(go.Scatter(
-            x = x_vals, 
-            y = y_vals, 
-            mode = "lines", 
-            name = case_label, 
-            line = dict(
-                color = case_colours[case_label], 
-                width = 2.5,
-                dash = case_styles[case_label],
-        ), 
-        hovertemplate = (
-            f"<b>{case_label}</b><br>"
-            "Return: %{x:;2%}<br>"
-            "Density: %{y:.2f}"
-            "<extra></extra>"
-        ), 
-        ))
 
-    # Add a vertical line at zero
-    fig.add_vline(
-        x = 0, 
-        line_width = 1, 
-        line_dash = "dash", 
-        line_color = "rgba(255,255,255,0.4)", 
-        annotation_text = "Zero Return", 
-        annotation_position = "top right", 
+        fig.add_trace(
+            go.Histogram(
+                x = returns_array,
+                name = case_label,
+                histnorm = "probability",
+                opacity = 0.85,
+                marker_color = case_colours[case_label],
+                marker_line = dict(
+                    color = case_colours[case_label],
+                    width = 0.5,
+                ),
+                nbinsx = 25,
+                showlegend = False,
+                hovertemplate = (
+                    f"<b>{case_label}</b><br>"
+                    "Return: %{x}<br>"
+                    "Frequency: %{y:.1%}"
+                    "<extra></extra>"
+                ),
+            ),
+            row=row, col = col,
+        )
+
+        # Zero return line on each subplot
+        fig.add_vline(
+            x = 0,
+            line_width = 1,
+            line_dash = "dash",
+            line_color = "rgba(255,255,255,0.4)",
+            row = row,
+            col = col,
+        )
+
+    # Apply axis formatting to all subplots
+    fig.update_xaxes(
+        tickformat = ".1%",
+        showgrid = True,
+        gridcolor = "rgba(255,255,255,0.1)",
+        color = "#FFFFFF",
+        title_text = "Monthly Return",
+        title_font = dict(size=11, color="#FFFFFF"),
+    )
+    fig.update_yaxes(
+        tickformat = ".1%",
+        showgrid = True,
+        gridcolor = "rgba(255,255,255,0.1)",
+        color = "#FFFFFF",
+        title_text = "Relative Frequency",
+        title_font = dict(size=11, color="#FFFFFF"),
     )
 
-    # Layout
+    # Subplot title colour — these sit in annotations
+    for annotation in fig.layout.annotations:
+        annotation.font.color = "#FFFFFF"
+        annotation.font.size = 13
+
     fig.update_layout(
         title = dict(
             text = "Monthly Return Distribution — All Cases",
-            font = dict(size = 16),
-            x = 0.5,        
+            font = dict(size=16, color="#FFFFFF"),
+            x  = 0.5,
             xanchor = "center",
         ),
-        xaxis = dict(
-            title = "Monthly Return",
-            tickformat = ".1%",    
-            showgrid = True,
-            gridcolor = "rgba(255, 255, 255, 0.1)",
-            color = "#FFFFFF", 
-        ),
-        yaxis = dict(
-            title = "Probability Density",
-            showgrid = True,
-            gridcolor = "rgba(255, 255, 255, 0.1)",
-            color = "#FFFFFF",
-        ),
-        legend = dict(
-            orientation = "h",         
-            yanchor = "bottom",
-            y = 1.02,        
-            xanchor = "right",
-            x = 1,
-            font = dict(color = "#FFFFFF"), 
-        ),
-        hovermode = "x unified",     
-        plot_bgcolor = "rgba(0, 0, 0, 0)",
-        paper_bgcolor ="rgba(0, 0, 0, 0)",
-        height = 500,
+        plot_bgcolor = "rgba(0,0,0,0)",
+        paper_bgcolor = "rgba(0,0,0,0)",
+        height = 620,
+        margin = dict(l=60, r=20, t=80, b=40),
     )
 
     return fig
@@ -296,7 +296,7 @@ def sharpe_comparison_chart(simulation_results: dict,
     fig.update_layout(
         title = dict(
             text = "Per-Asset Sharpe Ratios by Case",
-            font = dict(size=16),
+            font = dict(size=16, color = '#FFFFFF'),
             x = 0.5,
             xanchor = "center",
         ),
