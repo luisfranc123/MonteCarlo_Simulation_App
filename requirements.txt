@@ -2,23 +2,22 @@
 # MONTE CARLO OPTIONS HEDGED SIMULATOR
 # Requirements File
 # ============================================================
-
 # Install all dependencies with:
 #   pip install -r requirements.txt
 # ============================================================
 
 # --- Core App Framework ---
-streamlit == 1.55.0
+streamlit==1.55.0
 
 # --- Financial Data ---
-yfinance == 1.2.0
+yfinance==1.2.0
 
 # --- Data Manipulation ---
-pandas == 2.3.3
-numpy == 2.4.3
+pandas==2.3.3
+numpy==2.4.3
 
 # --- Statistical Analysis ---
-scipy == 1.17.1
+scipy==1.17.1
 
 # --- Data Visualization ---
-plotly == 6.6.0
+plotly==6.6.0
