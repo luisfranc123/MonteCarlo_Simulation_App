@@ -87,14 +87,14 @@ Market data is fetched live from Yahoo Finance using a 5-year historical window.
 ```
 Monte_Carlo_Simulation/
 │
-├── app.py              # Streamlit entry point — the user interface
-├── data.py             # Asset definitions, yfinance data fetching
-├── simulation.py       # Monte Carlo engine — all four cases
-├── options.py          # Black-Scholes pricing and collar logic
-├── analytics.py        # Portfolio statistics computation
-├── charts.py           # Plotly visualisations
-├── requirements.txt    # Python dependencies
-└── README.md           # This file
+├── app.py # Streamlit entry point — the user interface
+├── data.py # Asset definitions, yfinance data fetching
+├── simulation.py # Monte Carlo engine — all four cases
+├── options.py # Black-Scholes pricing and collar logic
+├── analytics.py # Portfolio statistics computation
+├── charts.py # Plotly visualisations
+├── requirements.txt # Python dependencies
+└── README.md # This file
 ```
 
 ---
